@@ -128,6 +128,12 @@
         var speedMultiplier = 1;
         var pointsX = [];
         var pointsY = [];
+        const PATH_WIDTH = 1;
+        var pathStroke = 'rgb(134, 123, 30)';
+        let timer = 0;
+        let hue;
+
+        drawPath.setAttribute('stroke-width', PATH_WIDTH);
 
         function degToRad(degrees) {
             return degrees / 360 * 2 * Math.PI;
@@ -165,7 +171,7 @@
                 let armPath = document.createElementNS('http://www.w3.org/2000/svg', 'path');
                 armPath.setAttribute('d', 'M 0,0');
                 armPath.setAttribute('stroke', 'black');
-                armPath.setAttribute('stroke-width', '3');
+                armPath.setAttribute('stroke-width', '0.5');
                 svg.appendChild(armPath);
                 armPaths.push(armPath);
             }
@@ -201,6 +207,11 @@
             path = `M ${pointsX[pointsX.length - 1]},${pointsY[pointsY.length - 1]} `;
         }
 
+        function updateColor(hue) {
+            pathStroke = `hsl(${hue}, 100%, 50%)`;
+            drawPath.setAttribute('stroke', pathStroke);
+        }
+
         updateArms();
         resetArmsInput();
         resetSVGPath();
@@ -212,6 +223,7 @@
             }
             let deltaTime = timestamp - lastTimestamp;
             lastTimestamp = timestamp;
+
 
             //if (isRunningFrame) {
             //    isRunningFrame = false;
@@ -225,6 +237,11 @@
             // Drawing
             if (isRunning) {
                 for (let iteration = 0; iteration < iterations; iteration++) {
+                    timer += deltaTime / 5;
+                    hue = timer % 360;
+                    console.log(timer);
+
+                    updateColor(hue);
                     updateArms();
                     
                     if (pointsX.length == 4) {
