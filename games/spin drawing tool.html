@@ -1,0 +1,261 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:100,200,300,400,500,600,700,800,900" type="text/css">
+    <link rel="stylesheet" href="../style.css">
+    <link rel="icon" href="../resources/Squarun Square.svg">
+    <title>Spin Drawing Tool - SunE's Site</title>
+</head>
+<body>
+    <!--Top Bar-->
+    <div class="topbar" id="topbar">
+        <script src="../topbar_setup (in folder).js"></script>
+    </div>
+
+    <!--Title-->
+    <div class="titlesection" style="background-image:url('placeholder');">
+        <div>
+            <h1>Spin Drawing Tool</h1>
+        </div>
+    </div>
+
+    <!--Website-->
+    <div class="section">
+        <div>
+            <div style="width:100%">
+                <div style="background-color:#88d89d;">
+                    <!--FPS Text-->
+                    <p id="fps text" style="text-align:center;"> FPS: </p>
+
+                    <div class="center">
+                        <!--Iterations-->
+                        <div class="column">
+                            <input type="range" min="1" max="10" step="1" value="1" style="width: 25vw;" oninput="iterations = parseInt(this.value, 10); maxIterationsText.textContent = `Iterations: ${this.value}`" />
+                            <p id="max iterations text" style="text-align:center;"> Iterations: 1 </p>
+                        </div>
+                        <!--Speed-->
+                        <div class="column">
+                            <input type="range" min="-4" max="2" step="0.25" value="0" style="width: 25vw;" oninput="speedMultiplier = 10 ** parseFloat(this.value, 10); speedText.textContent = `Speed: ${speedMultiplier}`" />
+                            <p id="speed text" style="text-align:center;"> Speed: 1 </p>
+                        </div>
+                    </div>
+
+                    <!--Arms Amount-->
+                    <div class="center">
+                        <div class="column" style="margin: 30px;">
+                            <p style="text-align:center; margin: 15px;"> Amount of Drawing Arms </p>
+                            <input type="number" min="1" step="1" value="3" style="width: 300px;" oninput="armsAmount = parseInt(this.value, 10); resetArmsInput();" />
+                        </div>
+                    </div>
+
+                    <!--Lists-->
+                    <div class="center">
+                        <div class="column">
+                            <p style="text-align: center; margin: 5px;"> Length </p>
+                            <div style="width: 25vw; border: none; margin: 0px; padding: 10px;" id="arms length list">
+
+                            </div>
+                        </div>
+                        <div class="column">
+                            <p style="text-align: center; margin: 5px;"> Speed </p>
+                            <div style="width: 25vw; border: none; margin: 0px; padding: 10px;" id="arms speed list">
+
+                            </div>
+                        </div>
+                    </div>
+
+                    <!--Pause/Resume-->
+                    <div class="center">
+                        <div style="border:none; display:inline-flex; width:auto;">
+                            <div class="column" style="width: 100px; display: flex; align-items: center;">
+                                <button type="button" style="width:100px; height: 50px;" onmousedown="isRunning = !isRunning; this.textContent = isRunning ? 'Pause' : 'Resume'; "> Start </button>
+                            </div>
+                        </div>
+
+                        <div style="border:none; display:inline-flex; width:auto;">
+                            <button type="button" style="width:100px; height: 50px;" onmousedown="resetSVGPath()"> Erase </button>
+                            <!--</div>-->
+                        </div>
+                    </div>
+
+                    <!--Canvas-->
+                    <div class="center">
+                        <svg id="svg" width="960" height="540" style="border: 5px solid #1b374f; border-radius: 10px;">
+                            <path d="M 0,0" stroke="blue" fill="transparent" stroke-width="3" />
+                            <!--<path d="M 480,270 L 480,270" stroke="black" fill="transparent" stroke-width="3" />
+            <path d="M 480,270 L 480,270" stroke="black" fill="transparent" stroke-width="3" />
+            <path d="M 480,270 L 480,270" stroke="black" fill="transparent" stroke-width="3" />-->
+                        </svg>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+
+    <script>
+        // SETUP ===================================================================================
+        /** @type {SVGElement} */
+        const svg = document.getElementById('svg');
+        const drawPath = svg.querySelector('path');
+        const CANVAS_WIDTH = svg.width.baseVal.value;
+        const CANVAS_HEIGHT = svg.height.baseVal.value;
+        /** @type {HTMLParagraphElement} */
+        const fpsText = document.getElementById('fps text');
+        
+        var lastTimestamp = -1;
+        var isRunningFrame = false;
+
+        // Arms + Drawing SVG
+        /** @type {HTMLParagraphElement} */
+        const maxIterationsText = document.getElementById('max iterations text');
+        /** @type {HTMLParagraphElement} */
+        const speedText = document.getElementById('speed text');
+        const armsLengthList = document.getElementById('arms length list');
+        const armsSpeedList = document.getElementById('arms speed list');
+
+        var isRunning = false;
+        var iterations = 1;
+        var armsAmount = 3;
+        var path = "";      // Path d attribute
+        var armPaths = [];  // Path nodes
+        const DEFAULT_ARM_LENGTH = 25;
+        var armsLength = [125, 62.5, 37.5];
+        var armsRotation = [0, 0, 0];
+        const DEFAULT_ARM_SPEED = 10;
+        var armsSpeed = [10, -9.4, -10];
+        var speedMultiplier = 1;
+        var pointsX = [];
+        var pointsY = [];
+
+        function degToRad(degrees) {
+            return degrees / 360 * 2 * Math.PI;
+        }
+
+        function updateArms() {
+            let x = CANVAS_WIDTH / 2;
+            let y = CANVAS_HEIGHT / 2;
+            for (let i = 0; i < armsAmount; i++) {
+                armsRotation[i] += armsSpeed[i] * speedMultiplier / iterations;
+                while (armsRotation[i] < 0) armsRotation[i] += 360;
+                armsRotation[i] %= 360;
+                x += armsLength[i] * Math.cos(degToRad(armsRotation[i]));
+                y += armsLength[i] * Math.sin(degToRad(armsRotation[i]));
+            }
+            pointsX.push(x);
+            pointsY.push(y);
+        }
+
+        function getArmPosition(armIndex) {
+            let x = CANVAS_WIDTH / 2;
+            let y = CANVAS_HEIGHT / 2;
+            for (let i = 0; i < armIndex;  i++) {
+                x += armsLength[i] * Math.cos(degToRad(armsRotation[i]));
+                y += armsLength[i] * Math.sin(degToRad(armsRotation[i]));
+            }
+            return [x, y];
+        }
+
+        function resetArmsInput() {
+            // Arm Paths
+            for (armPath of armPaths) armPath.remove();
+            armPaths.length = 0;
+            for (let i = 0; i < armsAmount; i++) {
+                let armPath = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+                armPath.setAttribute('d', 'M 0,0');
+                armPath.setAttribute('stroke', 'black');
+                armPath.setAttribute('stroke-width', '3');
+                svg.appendChild(armPath);
+                armPaths.push(armPath);
+            }
+
+            // Arrays
+            while (armsLength.length < armsAmount) {
+                armsLength.push(DEFAULT_ARM_LENGTH);
+                armsRotation.push(0);
+                armsSpeed.push(DEFAULT_ARM_SPEED);
+            }
+
+            // Interactable Input Lists
+            armsLengthList.replaceChildren();
+            armsSpeedList.replaceChildren();
+            for (let i = 0; i < armsAmount; i++) {
+                let lengthInput = document.createElement('input');
+                lengthInput.setAttribute('type', 'number');
+                lengthInput.setAttribute('value', armsLength[i]);
+                lengthInput.setAttribute('style', 'width: 100%');
+                lengthInput.setAttribute('oninput', `armsLength[${i}] = parseFloat(this.value, 10)`);
+                armsLengthList.appendChild(lengthInput);
+
+                let speedInput = document.createElement('input');
+                speedInput.setAttribute('type', 'number');
+                speedInput.setAttribute('value', armsSpeed[i]);
+                speedInput.setAttribute('style', 'width: 100%');
+                speedInput.setAttribute('oninput', `armsSpeed[${i}] = parseFloat(this.value, 10)`);
+                armsSpeedList.appendChild(speedInput);
+            }
+        }
+
+        function resetSVGPath() {
+            path = `M ${pointsX[pointsX.length - 1]},${pointsY[pointsY.length - 1]} `;
+        }
+
+        updateArms();
+        resetArmsInput();
+        resetSVGPath();
+
+        // UPDATE ===================================================================================
+        function update(timestamp) {
+            if (lastTimestamp == -1) {
+                lastTimestamp = timestamp;
+            }
+            let deltaTime = timestamp - lastTimestamp;
+            lastTimestamp = timestamp;
+
+            //if (isRunningFrame) {
+            //    isRunningFrame = false;
+            //    while (!isRunningFrame);
+            //}
+            //isRunningFrame = true;
+
+            // FPS Text
+            fpsText.textContent = `FPS: ${Math.round(1 / (deltaTime / 1000))}`;
+
+            // Drawing
+            if (isRunning) {
+                for (let iteration = 0; iteration < iterations; iteration++) {
+                    updateArms();
+                    
+                    if (pointsX.length == 4) {
+                        let x0 = pointsX[0], y0 = pointsY[0];
+                        let x1 = pointsX[1], y1 = pointsY[1];
+                        let x2 = pointsX[2], y2 = pointsY[2];
+                        let x3 = pointsX[3], y3 = pointsY[3];
+                        path += `C ${x1 + (x2 - x0) / 6},${y1 + (y2 - y0) / 6} ${x2 - (x3 - x1) / 6},${y2 - (y3 - y1) / 6} ${x2},${y2} `;
+
+                        pointsX.shift();
+                        pointsY.shift();
+                        drawPath.setAttribute('d', path + `L ${x3},${y3}`);  // UPDATE PATH ===================
+                    }
+                    for (let i = 0; i < armsAmount; i++) {
+                        let x, y, x1, y1;
+                        [x1, y1] = i == 0 ? [CANVAS_WIDTH / 2, CANVAS_HEIGHT / 2] : getArmPosition(i);
+                        [x, y] = getArmPosition(i + 1);
+                        armPaths[i].setAttribute('d', `M ${x1},${y1} L ${x},${y}`)
+                    }
+                    //console.log(armsRotation);
+                }
+            }
+
+            requestAnimationFrame(update);
+
+            //while (isRunningFrame);
+            //isRunningFrame = true;
+        }
+
+        requestAnimationFrame(update);
+    </script>
+    
+</body>
+</html>
